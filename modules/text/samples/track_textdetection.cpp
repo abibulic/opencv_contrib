@@ -19,6 +19,7 @@ void CountDetection(vector<Rect> groups_boxes, vector<int> xmin, vector<int> ymi
 void CountRegionDetect(vector<ERStat> region_rect, vector<int> xmin, vector<int> ymin, vector<int> xmax, vector<int> ymax, vector<int> &good_region, vector<int> &bad_region, vector<int> &false_region);
 void start_filter();
 void on_trackbar(int, void*);
+void callbackButton(int, void*);
 
 const int alpha_max = 125;
 const int beta_max = 100;
@@ -29,6 +30,7 @@ const int prob3_max = 100;
 int alpha;
 int beta, gamma;
 int prob1, prob2, prob3;
+int R, G, B, H, S, V, G2;
 Mat src1;
 vector<Mat> channels;
 vector<vector<ERStat> > regions;
@@ -55,13 +57,13 @@ int main(int argc, const char * argv[])
 	createTrackbar("Min prob2", "Threshold", &prob3, prob3_max, on_trackbar);
 	
 	namedWindow("Channels", WINDOW_AUTOSIZE);
-	createTrackbar("ChannelR", "Channels", &alpha, 1, on_trackbar);
-	createTrackbar("ChannelG", "Channels", &alpha, 1, on_trackbar);
-	createTrackbar("ChannelB", "Channels", &alpha, 1, on_trackbar);
-	createTrackbar("ChannelH", "Channels", &alpha, 1, on_trackbar);
-	createTrackbar("ChannelS", "Channels", &alpha, 1, on_trackbar);
-	createTrackbar("ChannelV", "Channels", &alpha, 1, on_trackbar);
-	createTrackbar("ChannelG", "Channels", &alpha, 1, on_trackbar);
+	createTrackbar("ChannelR", "Channels", &R, 1, callbackButton);
+	createTrackbar("ChannelG", "Channels", &G, 1, callbackButton);
+	createTrackbar("ChannelB", "Channels", &B, 1, callbackButton);
+	createTrackbar("ChannelH", "Channels", &H, 1, callbackButton);
+	createTrackbar("ChannelS", "Channels", &S, 1, callbackButton);
+	createTrackbar("ChannelV", "Channels", &V, 1, callbackButton);
+	createTrackbar("ChannelG2", "Channels", &G2, 1, callbackButton);
 
 	//read csv file
 	ifstream file("E:\\WORK\\AID\\SVN_xAID\\ClassifierData\\OCR\\TextLocalization\\Dataset\\TelegraTestSet\\LPR\\licenseplate\\LPR_10113431\\2017-06-25\\Annotations\\ispravljeno.csv");
@@ -84,8 +86,7 @@ int main(int argc, const char * argv[])
 		}
 
 		count_image++;
-
-		on_trackbar(alpha, 0);
+		callbackButton(R, 0);
 		waitKey(0);
 		xmin.clear();
 		ymin.clear();
@@ -101,18 +102,60 @@ void on_trackbar(int, void*)
 	start_filter();
 }
 
+void callbackButton(int, void*)
+{
+	channels.clear();
+	vector<Mat> channels_temp;
+	if (R == 0 && G == 0 && B == 0 && H == 0 && S == 0 && V == 0 && G2 == 0)
+	{
+		Mat mask = Mat::zeros(src1.rows, src1.cols, CV_8UC1);
+		channels.push_back(mask);
+	}
+	if (R == 1 || G == 1 || B == 1 || G2 == 1)
+	{
+		computeNMChannels(src1, channels_temp, 0);
+		Mat channelR = channels_temp[0];
+		Mat channelG = channels_temp[1];
+		Mat channelB = channels_temp[2];
+		Mat channelG2 = channels_temp[4];
+		if (R==1)
+		channels.push_back(channelR);
+		if (G == 1)
+			channels.push_back(channelG);
+		if (B == 1)
+			channels.push_back(channelB);
+		if (G2 == 1)
+			channels.push_back(channelG2);
+	}
+	if (H == 1 || S == 1 || V == 1)
+	{
+		computeNMChannels(src1, channels_temp, 1);
+		Mat channelH = channels_temp[0];
+		Mat channelS = channels_temp[1];
+		Mat channelV = channels_temp[2];
+		if (H == 1)
+			channels.push_back(channelH);
+		if (S == 1)
+			channels.push_back(channelS);
+		if (V == 1)
+			channels.push_back(channelV);
+	}
+	on_trackbar(alpha, 0);
+}
+
+
 void start_filter()
 {
 	Mat src = src1.clone();
 	
-	// Extract channels to be processed individually
-	computeNMChannels(src, channels, 0);
+	//// Extract channels to be processed individually
+	//computeNMChannels(src, channels, 0);
 
-	Mat channel1 = channels[3];
-	//Mat channel2 = channels[4];
-	channels.clear();
-	channels.push_back(channel1);
-	//channels.push_back(channel2);
+	//Mat channel1 = channels[3];
+	////Mat channel2 = channels[4];
+	//channels.clear();
+	//channels.push_back(channel1);
+	////channels.push_back(channel2);
 
 	//int cn = (int)channels.size();
 	////Append negative channels to detect ER- (bright regions over dark background)
