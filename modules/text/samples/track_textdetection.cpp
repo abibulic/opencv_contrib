@@ -1,13 +1,3 @@
-/*
-* textdetection.cpp
-*
-* A demo program of the Extremal Region Filter algorithm described in
-* Neumann L., Matas J.: Real-Time Scene Text Localization and Recognition, CVPR 2012
-*
-* Created on: Sep 23, 2013
-*     Author: Lluis Gomez i Bigorda <lgomez AT cvc.uab.es>
-*/
-
 #include "opencv2/text.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc.hpp"
@@ -24,206 +14,83 @@ using namespace cv::text;
 void show_help_and_exit(const char *cmd);
 void groups_draw(Mat &src, vector<Rect> &groups);
 void er_show(vector<Mat> &channels, vector<vector<ERStat> > &regions);
-void separate_line(string &line, int &nobjects, vector<int> &xmin, vector<int> &ymin, vector<int> &xmax, vector<int> &ymax);
+void separate_line1(string &line, int &nobjects, vector<int> &xmin, vector<int> &ymin, vector<int> &xmax, vector<int> &ymax);
+void separate_line2(string &line, int &nobjects, vector<int> &xmin, vector<int> &ymin, vector<int> &xmax, vector<int> &ymax);
 void CountDetection(vector<Rect> groups_boxes, vector<int> xmin, vector<int> ymin, vector<int> xmax, vector<int> ymax, int &good_detect, int &bad_detect, int &false_detect);
 void CountRegionDetect(vector<ERStat> region_rect, vector<int> xmin, vector<int> ymin, vector<int> xmax, vector<int> ymax, vector<int> &good_region, vector<int> &bad_region, vector<int> &false_region);
-void FillRegionDetect(vector<Mat> channels, vector<vector<ERStat>> region_rect, vector<int> xmin, vector<int> ymin, vector<int> xmax, vector<int> ymax, float &percent);
+void start_filter();
+void on_trackbar(int, void*);
+void callbackButton(int, void*);
+
+const int alpha_max = 125;
+const int beta_max = 100;
+const int gamma_max = 100;
+const int prob1_max = 100;
+const int prob2_max = 100;
+const int prob3_max = 100;
+int alpha;
+int beta, gamma;
+int prob1, prob2, prob3;
+int R, G, B, H, S, V, G2;
+Mat src1;
+vector<Mat> channels;
+vector<vector<ERStat> > regions;
+int nobjects;
+vector<int> xmin, ymin, xmax, ymax;
+int count_image = 0;
 
 int main(int argc, const char * argv[])
 {
 	cout << "Start.." << endl;
+	alpha = 10;
+	beta = 1;
+	gamma = 2;
+	prob1 = 0;
+	prob2 = 0;
+	prob3 = 0;
+
+	namedWindow("Threshold", WINDOW_AUTOSIZE);
+	createTrackbar("Threshold", "Threshold", &alpha, alpha_max, on_trackbar);
+	createTrackbar("Min Dist", "Threshold", &beta, beta_max, on_trackbar);
+	createTrackbar("Max Dist", "Threshold", &gamma, gamma_max, on_trackbar);
+	createTrackbar("Min prob", "Threshold", &prob1, prob1_max, on_trackbar);
+	createTrackbar("Max prob", "Threshold", &prob2, prob2_max, on_trackbar);
+	createTrackbar("Min prob2", "Threshold", &prob3, prob3_max, on_trackbar);
+	
+	namedWindow("Channels", WINDOW_AUTOSIZE);
+	createTrackbar("ChannelR", "Channels", &R, 1, callbackButton);
+	createTrackbar("ChannelG", "Channels", &G, 1, callbackButton);
+	createTrackbar("ChannelB", "Channels", &B, 1, callbackButton);
+	createTrackbar("ChannelH", "Channels", &H, 1, callbackButton);
+	createTrackbar("ChannelS", "Channels", &S, 1, callbackButton);
+	createTrackbar("ChannelV", "Channels", &V, 1, callbackButton);
+	createTrackbar("ChannelG2", "Channels", &G2, 1, callbackButton);
 
 	//read csv file
-	ifstream file("E:\\WORK\\AID\\SVN_xAID\\ClassifierData\\OCR\\TextLocalization\\Dataset\\TelegraTestSet\\LPR\\licenseplate\\LPR_10113431\\2017-06-25\\Annotations\\ispravljeno.csv");
+	//ifstream file("E:\\WORK\\AID\\SVN_xAID\\ClassifierData\\OCR\\TextLocalization\\Dataset\\TelegraTestSet\\LPR\\licenseplate\\LPR_10113431\\2017-06-25\\Annotations\\ispravljeno.csv");
+	ifstream file("E:\\WORK\\AID\\SVN_xAID\\ClassifierData\\OCR\\TextLocalization\\Paths\\TelegraTestSet\\ConsumerCameras\\number_bus.csv");
 	string   line;
-
-	int nobjects;
-	vector<int> xmin, ymin, xmax, ymax;
-	int count_image = 0;
-
-	//write csv file
-	ofstream myfile;
-	myfile.open("E:\\WORK\\AID\\SVN_xAID\\ClassifierData\\OCR\\TextLocalization\\Paths\\TelegraTestSet\\PTZ\\text_precision_check.csv");
-	myfile << "ImageNO; true; bad; false\n";
-	ofstream myfile2;
-	myfile2.open("E:\\WORK\\AID\\SVN_xAID\\ClassifierData\\OCR\\TextLocalization\\Paths\\TelegraTestSet\\PTZ\\text_precision_check2.csv");
-	myfile2 << "Channels; true; bad; false\n";
 
 	while (getline(file, line))
 	{
-		separate_line(line, nobjects, xmin, ymin, xmax, ymax);
-		
-		/*Mat src = imread("E:\\WORK\\AID\\SVN_xAID\\ClassifierData\\OCR\\TextLocalization\\Dataset\\TelegraTestSet\\LPR\\licenseplate\\LPR_10113431\\2017-06-25\\IMG\\2017-06-25_08-35-19-481_ZG9354BJ-HRV.jpg");
-		xmin[0] = 2007;
-		ymin[0] = 241;
-		xmax[0] = 2145;
-		ymax[0] = 265;*/
-		
-		
-		Mat src = imread(line);
+	
+		separate_line2(line, nobjects, xmin, ymin, xmax, ymax);
 
-		resize(src, src, Size(), 0.3, 0.3, INTER_LINEAR);
-		for (int i = 0; i < xmin.size(); i++)
-		{
-			xmin[i] = xmin[i] * 0.3;
-			ymin[i] = ymin[i] * 0.3;
-			xmax[i] = xmax[i] * 0.3;
-			ymax[i] = ymax[i] * 0.3;
-		}
+		src1 = imread(line);
+
+		//resize image
+		//resize(src1, src1, Size(), 0.3, 0.3, INTER_LINEAR);
+		//for (int i = 0; i < xmin.size(); i++)
+		//{
+		//	xmin[i] = xmin[i] * 0.3;
+		//	ymin[i] = ymin[i] * 0.3;
+		//	xmax[i] = xmax[i] * 0.3;
+		//	ymax[i] = ymax[i] * 0.3;
+		//}
 
 		count_image++;
-
-		//probaa
-		Mat maskedImage;
-		Mat mask(src.size(), src.type());
-		mask.setTo(cv::Scalar(0, 0, 0));
-
-		for (size_t i = 0; i < xmin.size(); i++)
-		{
-			rectangle(mask, Point(xmin[i], ymin[i]), Point(xmax[i], ymax[i]), Scalar(255, 255, 255), -1, 8, 0);
-		}
-
-		src.copyTo(src, mask);
-
-		// Extract channels to be processed individually
-		vector<Mat> channels;
-		computeNMChannels(src, channels, 0);
-
-		//use only R and gradient
-		Mat channel1 = channels[0];
-		Mat channel2 = channels[4];
-		channels.clear();
-		channels.push_back(channel1);
-		channels.push_back(channel2);
-
-		//proba
-		/*
-		Mat hsv;
-		cvtColor(src, hsv, COLOR_RGB2HSV);
-		vector<Mat> channelsHSV;
-		split(src, channelsHSV);
-		channels.push_back(channelsHSV[2]);
-		*/
-
-		int cn = (int)channels.size();
-		//test
-		//cn = 1;
-		//Append negative channels to detect ER- (bright regions over dark background)
-		for (int c = 0; c < cn - 1; c++)
-			channels.push_back(255 - channels[c]);
-		
-		//show channels
-		/*
-		for (int i = 0; i < channels.size(); i++)
-		{
-		imshow("1" + to_string(i), channels[i]);
-		waitKey(10);
-		}
-		*/
-
-		// Create ERFilter objects with the 1st and 2nd stage default classifiers
-		Ptr<ERFilter> er_filter1 = createERFilterNM1(loadDummyClassifier(), 10, 0.00001, 0.0002, 0, false, 0);
-		Ptr<ERFilter> er_filter2 = createERFilterNM2(loadDummyClassifier(), 0);
-
-		vector<vector<ERStat> > regions(channels.size());
-		// Apply the default cascade classifier to each independent channel (could be done in parallel)
-		cout << "Image" << count_image << ": " << "Extracting Class Specific Extremal Regions from " << (int)channels.size() << " channels ..." << endl;
-		cout << "    (...) this may take a while (...)" << endl << endl;
-		for (int c = 0; c < (int)channels.size(); c++)
-		{
-			er_filter1->run(channels[c], regions[c]);
-			er_filter2->run(channels[c], regions[c]);
-		}
-
-		//crtaj regije
-		/*
-		Mat src2 = src.clone();
-		for (int c = 0; c < (int)channels.size(); c++) 
-		{
-
-		for (int i = 0; i < ((regions)._Myfirst)[c].size(); i++)
-		{
-		rectangle(src2, ((((regions)._Myfirst)[c])._Myfirst)[i].rect, Scalar(255, (c * 28), 0), 3, 8);
-		imshow("rect", src2);
-		waitKey(1);
-		}
-
-		}
-		*/
-		//evaluate region detection
-		vector <int> good_region;
-		vector <int> bad_region;
-		vector <int> false_region;
-		float percent;
-		for (int c = 0; c < (int)channels.size(); c++)
-		{
-			CountRegionDetect(regions[c], xmin, ymin, xmax, ymax, good_region, bad_region, false_region);
-		}
-
-		//izračunaj postotak koliko je dobrih regija prekrilo tablicu
-		FillRegionDetect(channels, regions, xmin, ymin, xmax, ymax, percent);
-
-		// Detect character groups
-		cout << "Grouping extracted ERs ... " << endl << endl;
-		vector< vector<Vec2i> > region_groups;
-		vector<Rect> groups_boxes;
-		erGrouping(src, channels, regions, region_groups, groups_boxes, ERGROUPING_ORIENTATION_HORIZ);
-		//erGrouping(src, channels, regions, region_groups, groups_boxes, ERGROUPING_ORIENTATION_ANY, "E:\\opencv3_2\\sources\\modules\\text\\samples/trained_classifier_erGrouping.xml", 0.1);
-
-		//evaluate grouped detection
-		int good_detect = 0;
-		int bad_detect = 0;
-		int false_detect = 0;
-		CountDetection(groups_boxes, xmin, ymin, xmax, ymax, good_detect, bad_detect, false_detect);
-
-		//parsiranje podataka	
-
-		myfile << "image" << count_image << ";" << good_detect << "; " << bad_detect << "; " << false_detect << "\n";
-		myfile2 << "image" << count_image << "\n";
-		for (int c = 0; c < (int)channels.size(); c++)
-		{
-			myfile2 << "channel" << c << ";" << good_region[c] << "; " << bad_region[c] << "; " << false_region[c] << "\n";
-		}
-
-
-		//vizualizacija
-		//groups_draw(src, groups_boxes);
-		//for (int i = 0; i < nobjects; i++)
-		//{
-		//	rectangle(src, Point(xmin[i], ymin[i]), Point(xmax[i], ymax[i]), Scalar(0, 0, 255), 2, 8);
-		//}
-		//imshow("grouping", src);
-
-
-		//cout << "Done!" << endl << endl;
-		//cout << "Press 'space' to show the extracted Extremal Regions, any other key to exit." << endl << endl;
-
-		//if ((waitKey() & 0xff) == ' ')
-		//{
-		//	//er_show(channels, regions);
-		//	Mat src2 = src.clone();
-		//	for (int c = 0; c < (int)channels.size(); c++)
-		//	{
-
-		//		for (int i = 0; i < ((regions)._Myfirst)[c].size(); i++)
-		//		{
-		//			rectangle(src2, ((((regions)._Myfirst)[c])._Myfirst)[i].rect, Scalar(255, (c * 28), 0), 3, 8);
-		//			imshow("rect", src2);
-		//			waitKey(1);
-		//		}
-		//	}
-		//}
-		
-
-		// memory clean-up
-		er_filter1.release();
-		er_filter2.release();
-		regions.clear();
-		if (!groups_boxes.empty())
-		{
-			groups_boxes.clear();
-		}
-
+		callbackButton(R, 0);
+		waitKey(0);
 		xmin.clear();
 		ymin.clear();
 		xmax.clear();
@@ -231,10 +98,137 @@ int main(int argc, const char * argv[])
 
 	}
 	file.close();
-	myfile.close();
-	myfile2.close();
 }
 
+void on_trackbar(int, void*)
+{
+	start_filter();
+}
+
+void callbackButton(int, void*)
+{
+	
+	on_trackbar(alpha, 0);
+}
+
+
+void start_filter()
+{
+	Mat src = src1.clone();
+	
+	//// Extract channels to be processed individually
+	//computeNMChannels(src, channels, 0);
+
+	//Mat channel1 = channels[3];
+	////Mat channel2 = channels[4];
+	//channels.clear();
+	//channels.push_back(channel1);
+	////channels.push_back(channel2);
+
+	//int cn = (int)channels.size();
+	////Append negative channels to detect ER- (bright regions over dark background)
+	//for (int c = 0; c < cn - 1; c++)
+	//	channels.push_back(255 - channels[c]);
+	vector<Mat> channels_temp;
+	if (R == 0 && G == 0 && B == 0 && H == 0 && S == 0 && V == 0 && G2 == 0)
+	{
+		Mat mask = Mat::zeros(src1.rows, src1.cols, CV_8UC1);
+		channels.push_back(mask);
+	}
+	if (R == 1 || G == 1 || B == 1 || G2 == 1)
+	{
+		computeNMChannels(src1, channels_temp, 0);
+		Mat channelR = channels_temp[0];
+		Mat channelG = channels_temp[1];
+		Mat channelB = channels_temp[2];
+		Mat channelG2 = channels_temp[4];
+		if (R == 1)
+			channels.push_back(channelR);
+		if (G == 1)
+			channels.push_back(channelG);
+		if (B == 1)
+			channels.push_back(channelB);
+		if (G2 == 1)
+			channels.push_back(channelG2);
+	}
+	if (H == 1 || S == 1 || V == 1)
+	{
+		computeNMChannels(src1, channels_temp, 1);
+		Mat channelH = channels_temp[0];
+		Mat channelS = channels_temp[1];
+		Mat channelV = channels_temp[2];
+		if (H == 1)
+			channels.push_back(channelH);
+		if (S == 1)
+			channels.push_back(channelS);
+		if (V == 1)
+			channels.push_back(channelV);
+	}
+
+	float beta_scaled = float(beta) / 100000;
+	float gamma_scaled = float(gamma) / 10000;
+	float prob1_scaled = float(prob1) / 100.f;
+	float prob2_scaled = float(prob2) / 100.f;
+	float prob3_scaled = float(prob3) / 100.f;
+
+	cout << "Image" << count_image << endl;
+	cout << "alpha: " << alpha << endl;
+	cout << "beta_scaled: " << beta_scaled << endl;
+	cout << "gamma_scaled: " << gamma_scaled << endl;
+	cout << "prob1_scaled: " << prob1_scaled << endl;
+	cout << "prob2_scaled: " << prob2_scaled << endl;
+	cout << "prob3_scaled: " << prob3_scaled << endl;
+
+	// Create ERFilter objects with the 1st and 2nd stage default classifiers
+	Ptr<ERFilter> er_filter1 = createERFilterNM1(loadDummyClassifier(), alpha, beta_scaled, gamma_scaled, prob1_scaled, false, prob2_scaled);
+	Ptr<ERFilter> er_filter2 = createERFilterNM2(loadDummyClassifier(), prob3_scaled);
+	vector<vector<ERStat> >regions(channels.size());
+	// Apply the default cascade classifier to each independent channel (could be done in parallel)
+
+	for (int c = 0; c < (int)channels.size(); c++)
+	 {
+		er_filter1->run(channels[c], regions[c]);
+		er_filter2->run(channels[c], regions[c]);
+	}
+
+	// Detect character groups
+	vector< vector<Vec2i> > region_groups;
+	vector<Rect> groups_boxes;
+	//erGrouping(src, channels, regions, region_groups, groups_boxes, ERGROUPING_ORIENTATION_HORIZ);
+	//erGrouping(src, channels, regions, region_groups, groups_boxes, ERGROUPING_ORIENTATION_ANY, "E:\\opencv3_2\\sources\\modules\\text\\samples/trained_classifier_erGrouping.xml", 0.1);
+
+	//crtanje grupa
+	groups_draw(src, groups_boxes);
+	for (int i = 0; i < nobjects; i++)
+	{
+		rectangle(src, Point(xmin[i], ymin[i]), Point(xmax[i], ymax[i]), Scalar(0, 0, 255), 2, 8);
+	}
+	imshow("Detections", src);
+
+	//crtanje regija
+	Mat src2 = src.clone();
+	for (int c = 0; c < (int)channels.size(); c++)
+	{
+
+		for (int i = 0; i < ((regions)._Myfirst)[c].size(); i++)
+		{
+			rectangle(src2, ((((regions)._Myfirst)[c])._Myfirst)[i].rect, Scalar(255, (c * 125), 0), 3, 8);
+			imshow("Threshold", src2);
+		}
+	}
+
+	cout << "**********************************************************************************" << endl << endl;
+
+	er_filter1.release();
+	er_filter2.release();
+	if (!groups_boxes.empty())
+	{
+		groups_boxes.clear();
+	}
+
+	er_show(channels, regions);
+	
+}
 
 void groups_draw(Mat &src, vector<Rect> &groups)
 {
@@ -265,12 +259,14 @@ void er_show(vector<Mat> &channels, vector<vector<ERStat> > &regions)
 		}
 		char buff[10]; char *buff_ptr = buff;
 		sprintf(buff, "channel %d", c);
-		imshow(buff_ptr, dst);
+		imshow("Binary", dst);
 	}
-	waitKey(-1);
+	channels.clear();
+	regions.clear();
+
 }
 
-void separate_line(string &line, int &nobjects, vector<int> &xmin, vector<int> &ymin, vector<int> &xmax, vector<int> &ymax)
+void separate_line1(string &line, int &nobjects, vector<int> &xmin, vector<int> &ymin, vector<int> &xmax, vector<int> &ymax)
 {
 
 	stringstream linestream(line);
@@ -297,9 +293,9 @@ void separate_line(string &line, int &nobjects, vector<int> &xmin, vector<int> &
 		/*
 		for (int i = 0; i < 1; i++)
 		{
-			stringstream linestream(line);
-			getline(linestream, data2, '\;');
-			line.erase(0, data2.size() + 1);
+		stringstream linestream(line);
+		getline(linestream, data2, '\;');
+		line.erase(0, data2.size() + 1);
 		}
 		*/
 		for (int i = 0; i < 4; i++)
@@ -325,6 +321,63 @@ void separate_line(string &line, int &nobjects, vector<int> &xmin, vector<int> &
 		}
 	}
 	line = "E:\\WORK\\AID\\SVN_xAID\\ClassifierData\\OCR\\TextLocalization\\Dataset\\TelegraTestSet\\LPR\\licenseplate\\LPR_10113431\\2017-06-25\\IMG\\" + data1;
+}
+
+void separate_line2(string &line, int &nobjects, vector<int> &xmin, vector<int> &ymin, vector<int> &xmax, vector<int> &ymax)
+{
+
+	stringstream linestream(line);
+	string data1;
+	string data2;
+
+	// If you have truly tab delimited data use getline() with third parameter.
+	// If your data is just white space separated data
+	// then the operator >> will do (it reads a space separated word into a string).
+	getline(linestream, data1, '\;');  // read up-to the first tab (discard tab).
+	line.erase(0, data1.size() + 1);
+
+	//get number of objects
+	for (int i = 0; i < 5; i++)
+	{
+		stringstream linestream(line);
+		getline(linestream, data2, '\;');
+		line.erase(0, data2.size() + 1);
+	}
+	nobjects = atoi(data2.c_str());
+
+	//erase to position
+	for (int nobj = 0; nobj < nobjects; nobj++)
+	{
+		for (int i = 0; i < 4; i++)
+		{
+			stringstream linestream(line);
+			getline(linestream, data2, '\;');
+			line.erase(0, data2.size() + 1);
+		}
+
+		for (int i = 0; i < 4; i++)
+		{
+			stringstream linestream(line);
+			getline(linestream, data2, '\;');
+			line.erase(0, data2.size() + 1);
+			switch (i)
+			{
+			case 0:
+				xmin.push_back(atoi(data2.c_str()));
+				break;
+			case 1:
+				ymin.push_back(atoi(data2.c_str()));
+				break;
+			case 2:
+				xmax.push_back(atoi(data2.c_str()));
+				break;
+			case 3:
+				ymax.push_back(atoi(data2.c_str()));
+				break;
+			}
+		}
+	}
+	line = data1;
 }
 
 void CountDetection(vector<Rect> groups_boxes, vector<int> xmin, vector<int> ymin, vector<int> xmax, vector<int> ymax, int &good_detect, int &bad_detect, int &false_detect)
@@ -395,67 +448,4 @@ void CountRegionDetect(vector<ERStat> region_rect, vector<int> xmin, vector<int>
 	cout << "bad: " << bad << endl;
 	cout << "false: " << fals << endl;
 	*/
-}
-
-void FillRegionDetect(vector<Mat> channels, vector<vector<ERStat>> region_rect, vector<int> xmin, vector<int> ymin, vector<int> xmax, vector<int> ymax, float &percent)
-{
-	int sum_intersact = 0;
-	vector<ERStat> intersact_regions;
-	Rect ultimate;
-	for (int i = 0; i < xmin.size(); i++)
-	{
-		Rect A(xmin[i], ymin[i], (xmax[i] - xmin[i]), (ymax[i] - ymin[i]));
-		for (int c = 0; c < channels.size(); c++)
-		{
-			for (int j = 0; j < ((region_rect)._Myfirst)[c].size(); j++)
-			{
-
-				int intersects = (A & ((((region_rect)._Myfirst)[c])._Myfirst)[j].rect).area();
-
-				if (intersects <= int(A.area()) && intersects <= ((((region_rect)._Myfirst)[c])._Myfirst)[j].rect.area() && intersects >((((region_rect)._Myfirst)[c])._Myfirst)[j].rect.area()*0.5)
-				{
-
-					intersact_regions.push_back(((((region_rect)._Myfirst)[c])._Myfirst)[j]);
-
-				}
-				if (intersects <= ((((region_rect)._Myfirst)[c])._Myfirst)[j].rect.area()*0.8 && intersects > 0)
-				{
-
-				}
-				if (intersects == 0)
-				{
-
-				}
-			}
-
-
-		}
-
-		ultimate.x = intersact_regions[0].rect.x;
-		ultimate.y = intersact_regions[0].rect.y;
-		ultimate.width = intersact_regions[0].rect.width;
-		ultimate.height = intersact_regions[0].rect.height;
-
-		for (int a = 1; a < intersact_regions.size(); a++)
-		{
-				Rect rect_a = intersact_regions[a].rect;
-				int min_x = min(rect_a.x, ultimate.x);
-				int min_y = min(rect_a.y, ultimate.y);
-				int max_x = max((rect_a.x + rect_a.width), (ultimate.x + ultimate.width));
-				int max_y = max((rect_a.y + rect_a.height), (ultimate.y + ultimate.height));
-				ultimate.x = min_x;
-				ultimate.y = min_y;
-				ultimate.width = max_x - min_x;
-				ultimate.height = max_y - min_y;
-				//rectangle(channels[0], intersact_regions[a].rect, Scalar(255, 255, 0), 3, 8);
-		}
-
-		percent = float(ultimate.area()) / float(A.area()) * 100.f;
-		/*rectangle(channels[0], ultimate, Scalar(255, 255, 0), 3, 8);
-		imshow("1231", channels[0]);
-		waitKey(0);*/
-		if (percent > 100)
-			percent = 100;
-		cout << "percent: " << percent << endl;
-	}
 }
