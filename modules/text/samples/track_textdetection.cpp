@@ -31,7 +31,7 @@ const int prob3_max = 100;
 int alpha;
 int beta, gamma;
 int prob1, prob2, prob3;
-int R, G, B, H, S, V, G2;
+int R, G, B, H, S, V, G2, I;
 Mat src1;
 vector<Mat> channels;
 vector<vector<ERStat> > regions;
@@ -57,36 +57,38 @@ int main(int argc, const char * argv[])
 	createTrackbar("Max prob", "Threshold", &prob2, prob2_max, on_trackbar);
 	createTrackbar("Min prob2", "Threshold", &prob3, prob3_max, on_trackbar);
 	
-	namedWindow("Channels", WINDOW_AUTOSIZE);
-	createTrackbar("ChannelR", "Channels", &R, 1, callbackButton);
-	createTrackbar("ChannelG", "Channels", &G, 1, callbackButton);
-	createTrackbar("ChannelB", "Channels", &B, 1, callbackButton);
-	createTrackbar("ChannelH", "Channels", &H, 1, callbackButton);
-	createTrackbar("ChannelS", "Channels", &S, 1, callbackButton);
-	createTrackbar("ChannelV", "Channels", &V, 1, callbackButton);
-	createTrackbar("ChannelG2", "Channels", &G2, 1, callbackButton);
+	namedWindow("Channels", WINDOW_NORMAL);
+	createTrackbar("Channel R", "Channels", &R, 1, callbackButton);
+	createTrackbar("Channel G", "Channels", &G, 1, callbackButton);
+	createTrackbar("Channel B", "Channels", &B, 1, callbackButton);
+	createTrackbar("Channel H", "Channels", &H, 1, callbackButton);
+	createTrackbar("Channel S", "Channels", &S, 1, callbackButton);
+	createTrackbar("Channel V", "Channels", &V, 1, callbackButton);
+	createTrackbar("Gradient", "Channels", &G2, 1, callbackButton);
+	createTrackbar("Invers", "Channels", &I, 1, callbackButton);
 
 	//read csv file
-	//ifstream file("E:\\WORK\\AID\\SVN_xAID\\ClassifierData\\OCR\\TextLocalization\\Dataset\\TelegraTestSet\\LPR\\licenseplate\\LPR_10113431\\2017-06-25\\Annotations\\ispravljeno.csv");
-	ifstream file("E:\\WORK\\AID\\SVN_xAID\\ClassifierData\\OCR\\TextLocalization\\Paths\\TelegraTestSet\\ConsumerCameras\\number_bus.csv");
+	ifstream file("E:\\WORK\\AID\\SVN_xAID\\ClassifierData\\OCR\\TextLocalization\\Dataset\\TelegraTestSet\\LPR\\licenseplate\\LPR_10113431\\2017-06-25\\Annotations\\ispravljeno.csv");
+	//ifstream file("E:\\WORK\\AID\\SVN_xAID\\ClassifierData\\OCR\\TextLocalization\\Paths\\TelegraTestSet\\ConsumerCameras\\number_bus2.csv");
 	string   line;
 
 	while (getline(file, line))
 	{
 	
-		separate_line2(line, nobjects, xmin, ymin, xmax, ymax);
+		separate_line1(line, nobjects, xmin, ymin, xmax, ymax);
+		//separate_line2(line, nobjects, xmin, ymin, xmax, ymax);
 
 		src1 = imread(line);
 
 		//resize image
-		//resize(src1, src1, Size(), 0.3, 0.3, INTER_LINEAR);
-		//for (int i = 0; i < xmin.size(); i++)
-		//{
-		//	xmin[i] = xmin[i] * 0.3;
-		//	ymin[i] = ymin[i] * 0.3;
-		//	xmax[i] = xmax[i] * 0.3;
-		//	ymax[i] = ymax[i] * 0.3;
-		//}
+		resize(src1, src1, Size(), 0.3, 0.3, INTER_LINEAR);
+		for (int i = 0; i < xmin.size(); i++)
+		{
+			xmin[i] = xmin[i] * 0.3;
+			ymin[i] = ymin[i] * 0.3;
+			xmax[i] = xmax[i] * 0.3;
+			ymax[i] = ymax[i] * 0.3;
+		}
 
 		count_image++;
 		callbackButton(R, 0);
@@ -164,6 +166,12 @@ void start_filter()
 		if (V == 1)
 			channels.push_back(channelV);
 	}
+	if (I == 1)
+	{
+		int cn = channels.size();
+		for (int c = 0; c < cn; c++)
+			channels.push_back(255 - channels[c]);
+	}
 
 	float beta_scaled = float(beta) / 100000;
 	float gamma_scaled = float(gamma) / 10000;
@@ -197,7 +205,9 @@ void start_filter()
 	//erGrouping(src, channels, regions, region_groups, groups_boxes, ERGROUPING_ORIENTATION_HORIZ);
 	//erGrouping(src, channels, regions, region_groups, groups_boxes, ERGROUPING_ORIENTATION_ANY, "E:\\opencv3_2\\sources\\modules\\text\\samples/trained_classifier_erGrouping.xml", 0.1);
 
-	//crtanje grupa
+	er_show(channels, regions);
+
+	//drow groups
 	groups_draw(src, groups_boxes);
 	for (int i = 0; i < nobjects; i++)
 	{
@@ -205,7 +215,7 @@ void start_filter()
 	}
 	imshow("Detections", src);
 
-	//crtanje regija
+	//drow regions
 	Mat src2 = src.clone();
 	for (int c = 0; c < (int)channels.size(); c++)
 	{
@@ -225,9 +235,8 @@ void start_filter()
 	{
 		groups_boxes.clear();
 	}
-
-	er_show(channels, regions);
-	
+	channels.clear();
+	regions.clear();
 }
 
 void groups_draw(Mat &src, vector<Rect> &groups)
@@ -261,9 +270,6 @@ void er_show(vector<Mat> &channels, vector<vector<ERStat> > &regions)
 		sprintf(buff, "channel %d", c);
 		imshow("Binary", dst);
 	}
-	channels.clear();
-	regions.clear();
-
 }
 
 void separate_line1(string &line, int &nobjects, vector<int> &xmin, vector<int> &ymin, vector<int> &xmax, vector<int> &ymax)
