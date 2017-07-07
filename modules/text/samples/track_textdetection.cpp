@@ -39,6 +39,17 @@ int nobjects;
 vector<int> xmin, ymin, xmax, ymax;
 int count_image = 0;
 
+//Timer
+double tt_tic = 0;
+
+void tic(){
+	tt_tic = getTickCount();
+}
+void toc(){
+	double tt_toc = (getTickCount() - tt_tic) / (getTickFrequency());
+	printf("toc: %4.3f sn", tt_toc);
+}
+
 int main(int argc, const char * argv[])
 {
 	cout << "Start.." << endl;
@@ -81,14 +92,14 @@ int main(int argc, const char * argv[])
 		src1 = imread(line);
 
 		//resize image
-		resize(src1, src1, Size(), 0.3, 0.3, INTER_LINEAR);
+		/*resize(src1, src1, Size(), 0.3, 0.3, INTER_LINEAR);
 		for (int i = 0; i < xmin.size(); i++)
 		{
 			xmin[i] = xmin[i] * 0.3;
 			ymin[i] = ymin[i] * 0.3;
 			xmax[i] = xmax[i] * 0.3;
 			ymax[i] = ymax[i] * 0.3;
-		}
+		}*/
 
 		count_image++;
 		callbackButton(R, 0);
@@ -192,13 +203,13 @@ void start_filter()
 	Ptr<ERFilter> er_filter2 = createERFilterNM2(loadDummyClassifier(), prob3_scaled);
 	vector<vector<ERStat> >regions(channels.size());
 	// Apply the default cascade classifier to each independent channel (could be done in parallel)
-
+	tic();
 	for (int c = 0; c < (int)channels.size(); c++)
 	 {
 		er_filter1->run(channels[c], regions[c]);
 		er_filter2->run(channels[c], regions[c]);
 	}
-
+	toc();
 	// Detect character groups
 	vector< vector<Vec2i> > region_groups;
 	vector<Rect> groups_boxes;
