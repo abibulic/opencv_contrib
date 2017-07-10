@@ -261,7 +261,8 @@ CV_EXPORTS_W Ptr<ERFilter::Callback> loadClassifierNM1(const String& filename);
 returns a pointer to ERFilter::Callback.
  */
 CV_EXPORTS_W Ptr<ERFilter::Callback> loadClassifierNM2(const String& filename);
-
+    
+CV_EXPORTS_W Ptr<ERFilter::Callback> loadDummyClassifier();
 
 //! computeNMChannels operation modes
 enum { ERFILTER_NM_RGBLGrad,
