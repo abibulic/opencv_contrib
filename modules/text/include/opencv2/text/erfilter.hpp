@@ -45,7 +45,6 @@
 #define __OPENCV_TEXT_ERFILTER_HPP__
 
 #include "opencv2/core.hpp"
-#include <vector>
 #include <deque>
 #include <string>
 
@@ -78,7 +77,7 @@ public:
     //! incrementally computable features
     int area;
     int perimeter;
-    int euler;                 //!< Euler's number
+    int euler;                 //!< euler number
     Rect rect;
     double raw_moments[2];     //!< order 1 raw moments to derive the centroid
     double central_moments[3]; //!< order 2 central moments to construct the covariance matrix
@@ -105,7 +104,7 @@ public:
     ERStat* next;
     ERStat* prev;
 
-    //! whenever the regions is a local maxima of the probability
+    //! wenever the regions is a local maxima of the probability
     bool local_maxima;
     ERStat* max_probability_ancestor;
     ERStat* min_probability_ancestor;
@@ -262,6 +261,7 @@ returns a pointer to ERFilter::Callback.
  */
 CV_EXPORTS_W Ptr<ERFilter::Callback> loadClassifierNM2(const String& filename);
 
+CV_EXPORTS_W Ptr<ERFilter::Callback> loadDummyClassifier();
 
 //! computeNMChannels operation modes
 enum { ERFILTER_NM_RGBLGrad,
@@ -284,7 +284,7 @@ magnitude (Grad).
  */
 CV_EXPORTS_W void computeNMChannels(InputArray _src, CV_OUT OutputArrayOfArrays _channels, int _mode = ERFILTER_NM_RGBLGrad);
 
-
+CV_EXPORTS_W void setGroupParams(float par1, float par2);
 
 //! text::erGrouping operation modes
 enum erGrouping_Modes {
@@ -317,7 +317,7 @@ enum erGrouping_Modes {
 
 @param channels Vector of single channel images CV_8UC1 from wich the regions were extracted.
 
-@param regions Vector of ER's retrieved from the ERFilter algorithm from each channel.
+@param regions Vector of ER's retreived from the ERFilter algorithm from each channel.
 
 @param groups The output of the algorithm is stored in this parameter as set of lists of indexes to
 provided regions.
@@ -353,7 +353,7 @@ CV_EXPORTS_W void erGrouping(InputArray image, InputArray channel,
 
 @param image Source image CV_8UC1 from which the MSERs where extracted.
 
-@param contours Input vector with all the contours (vector\<Point\>).
+@param contours Intput vector with all the contours (vector\<Point\>).
 
 @param regions Output where the ERStat regions are stored.
 
