@@ -66,7 +66,19 @@ namespace cv
 
 		using namespace cv::ml;
 		using namespace std;
-		using namespace cv::ml;
+
+		//Timer
+		double tt_tic = 0;
+
+		void tic(){
+			tt_tic = getTickCount();
+		}
+		void toc(){
+			double tt_toc = (getTickCount() - tt_tic) / (getTickFrequency());
+			printf("toc: %4.3f sec\n", tt_toc);
+		}
+
+		void setGroupParams(vector<int> parameters);
 
 		// Deletes a tree of ERStat regions starting at root. Used only
 		// internally to this implementation.
@@ -266,12 +278,10 @@ namespace cv
 			Mat src = image.getMat();
 			// assert correct image type
 			CV_Assert(src.type() == CV_8UC1);
-
 			if (thresholdDelta > 1)
 			{
 				src = (src / thresholdDelta) - 1;
 			}
-
 			const unsigned char * image_data = src.data;
 			int width = src.cols, height = src.rows;
 
@@ -3136,6 +3146,15 @@ namespace cv
 		/**************************************/
 
 		//threshold values for the Exhaustive Search algorithm (learned from training dataset)
+		float PAIR_MIN_REGION_DIST1 = 0;
+		float PAIR_MAX_REGION_DIST1 = 0;
+		void setGroupParams(float par1, float par2)
+		{
+			PAIR_MIN_REGION_DIST1 = par1;
+			PAIR_MAX_REGION_DIST1 = par2;
+			cout << PAIR_MIN_REGION_DIST1 << "  " << PAIR_MAX_REGION_DIST1 << endl;
+
+		}
 #define PAIR_MIN_HEIGHT_RATIO     0.04
 #define PAIR_MIN_CENTROID_ANGLE - 0.85
 #define PAIR_MAX_CENTROID_ANGLE   0.85
@@ -3149,9 +3168,7 @@ namespace cv
 
 #define SEQUENCE_MAX_TRIPLET_DIST 0.2
 #define SEQUENCE_MIN_LENGHT       2
-
-
-
+		
 		// struct line_estimates
 		// Represents a line estimate (as above) for an ER's group
 		// i.e.: slope and intercept of 2 top and 2 bottom lines
@@ -3537,8 +3554,8 @@ namespace cv
 			if ((height_ratio < PAIR_MIN_HEIGHT_RATIO) ||
 				(centroid_angle < PAIR_MIN_CENTROID_ANGLE) ||
 				(centroid_angle > PAIR_MAX_CENTROID_ANGLE) ||
-				(norm_distance  < PAIR_MIN_REGION_DIST) ||
-				(norm_distance  > PAIR_MAX_REGION_DIST))
+				(norm_distance  < PAIR_MIN_REGION_DIST1) ||
+				(norm_distance  > PAIR_MAX_REGION_DIST1))
 				return false;
 
 			if ((i->parent == NULL) || (j->parent == NULL)) // deprecate the root region
@@ -3721,7 +3738,7 @@ namespace cv
 						sequence1.triplets[j].estimates) < SEQUENCE_MAX_TRIPLET_DIST) &&
 						((float)max((sequence2.triplets[i].estimates.x_min - sequence1.triplets[j].estimates.x_max),
 						(sequence1.triplets[j].estimates.x_min - sequence2.triplets[i].estimates.x_max)) /
-						max(sequence2.triplets[i].estimates.h_max, sequence1.triplets[j].estimates.h_max) < 3 * PAIR_MAX_REGION_DIST))
+						max(sequence2.triplets[i].estimates.h_max, sequence1.triplets[j].estimates.h_max) < 3 * PAIR_MAX_REGION_DIST1))
 						return true;
 				}
 			}
