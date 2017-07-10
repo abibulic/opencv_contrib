@@ -18,20 +18,15 @@ void separate_line1(string &line, int &nobjects, vector<int> &xmin, vector<int> 
 void separate_line2(string &line, int &nobjects, vector<int> &xmin, vector<int> &ymin, vector<int> &xmax, vector<int> &ymax);
 void CountDetection(vector<Rect> groups_boxes, vector<int> xmin, vector<int> ymin, vector<int> xmax, vector<int> ymax, int &good_detect, int &bad_detect, int &false_detect);
 void CountRegionDetect(vector<ERStat> region_rect, vector<int> xmin, vector<int> ymin, vector<int> xmax, vector<int> ymax, vector<int> &good_region, vector<int> &bad_region, vector<int> &false_region);
-void start_filter();
-void on_trackbar(int, void*);
-void callbackButton(int, void*);
+void start_filter(int, void*);
 
-const int alpha_max = 125;
-const int beta_max = 100;
-const int gamma_max = 100;
-const int prob1_max = 100;
-const int prob2_max = 100;
-const int prob3_max = 100;
 int alpha;
 int beta, gamma;
 int prob1, prob2, prob3;
 int R, G, B, H, S, V, G2, I;
+int PAIR_MIN_HEIGHT_RATIO, PAIR_MIN_CENTROID_ANGLE, PAIR_MAX_CENTROID_ANGLE, PAIR_MIN_REGION_DIST, PAIR_MAX_REGION_DIST, PAIR_MAX_INTENSITY_DIST, PAIR_MAX_AB_DIST;
+int TRIPLET_MAX_DIST, TRIPLET_MAX_SLOPE;
+int SEQUENCE_MAX_TRIPLET_DIST, SEQUENCE_MIN_LENGHT;
 Mat src1;
 vector<Mat> channels;
 vector<vector<ERStat> > regions;
@@ -47,7 +42,7 @@ void tic(){
 }
 void toc(){
 	double tt_toc = (getTickCount() - tt_tic) / (getTickFrequency());
-	printf("toc: %4.3f sn", tt_toc);
+	printf("toc: %4.3f sec\n", tt_toc);
 }
 
 int main(int argc, const char * argv[])
@@ -61,22 +56,26 @@ int main(int argc, const char * argv[])
 	prob3 = 0;
 
 	namedWindow("Threshold", WINDOW_AUTOSIZE);
-	createTrackbar("Threshold", "Threshold", &alpha, alpha_max, on_trackbar);
-	createTrackbar("Min Dist", "Threshold", &beta, beta_max, on_trackbar);
-	createTrackbar("Max Dist", "Threshold", &gamma, gamma_max, on_trackbar);
-	createTrackbar("Min prob", "Threshold", &prob1, prob1_max, on_trackbar);
-	createTrackbar("Max prob", "Threshold", &prob2, prob2_max, on_trackbar);
-	createTrackbar("Min prob2", "Threshold", &prob3, prob3_max, on_trackbar);
-	
+	createTrackbar("Threshold", "Threshold", &alpha, 125, start_filter);
+	createTrackbar("Min Dist", "Threshold", &beta, 100, start_filter);
+	createTrackbar("Max Dist", "Threshold", &gamma, 100, start_filter);
+	createTrackbar("Min prob", "Threshold", &prob1, 100, start_filter);
+	createTrackbar("Max prob", "Threshold", &prob2, 100, start_filter);
+	createTrackbar("Min prob2", "Threshold", &prob3, 100, start_filter);
+
 	namedWindow("Channels", WINDOW_NORMAL);
-	createTrackbar("Channel R", "Channels", &R, 1, callbackButton);
-	createTrackbar("Channel G", "Channels", &G, 1, callbackButton);
-	createTrackbar("Channel B", "Channels", &B, 1, callbackButton);
-	createTrackbar("Channel H", "Channels", &H, 1, callbackButton);
-	createTrackbar("Channel S", "Channels", &S, 1, callbackButton);
-	createTrackbar("Channel V", "Channels", &V, 1, callbackButton);
-	createTrackbar("Gradient", "Channels", &G2, 1, callbackButton);
-	createTrackbar("Invers", "Channels", &I, 1, callbackButton);
+	createTrackbar("Channel R", "Channels", &R, 1, start_filter);
+	createTrackbar("Channel G", "Channels", &G, 1, start_filter);
+	createTrackbar("Channel B", "Channels", &B, 1, start_filter);
+	createTrackbar("Channel H", "Channels", &H, 1, start_filter);
+	createTrackbar("Channel S", "Channels", &S, 1, start_filter);
+	createTrackbar("Channel V", "Channels", &V, 1, start_filter);
+	createTrackbar("Gradient", "Channels", &G2, 1, start_filter);
+	createTrackbar("Invers", "Channels", &I, 1, start_filter);
+
+	namedWindow("Grouping", WINDOW_NORMAL);
+	createTrackbar("PAIR_MIN_REGION_DIST", "Grouping", &PAIR_MIN_REGION_DIST, 100, start_filter);
+	createTrackbar("PAIR_MAX_REGION_DIST", "Grouping", &PAIR_MAX_REGION_DIST, 500, start_filter);
 
 	//read csv file
 	ifstream file("E:\\WORK\\AID\\SVN_xAID\\ClassifierData\\OCR\\TextLocalization\\Dataset\\TelegraTestSet\\LPR\\licenseplate\\LPR_10113431\\2017-06-25\\Annotations\\ispravljeno.csv");
@@ -85,24 +84,24 @@ int main(int argc, const char * argv[])
 
 	while (getline(file, line))
 	{
-	
+
 		separate_line1(line, nobjects, xmin, ymin, xmax, ymax);
 		//separate_line2(line, nobjects, xmin, ymin, xmax, ymax);
 
 		src1 = imread(line);
 
 		//resize image
-		/*resize(src1, src1, Size(), 0.3, 0.3, INTER_LINEAR);
+		resize(src1, src1, Size(), 0.3, 0.3, INTER_LINEAR);
 		for (int i = 0; i < xmin.size(); i++)
 		{
 			xmin[i] = xmin[i] * 0.3;
 			ymin[i] = ymin[i] * 0.3;
 			xmax[i] = xmax[i] * 0.3;
 			ymax[i] = ymax[i] * 0.3;
-		}*/
+		}
 
 		count_image++;
-		callbackButton(R, 0);
+		start_filter(alpha, 0);
 		waitKey(0);
 		xmin.clear();
 		ymin.clear();
@@ -113,22 +112,10 @@ int main(int argc, const char * argv[])
 	file.close();
 }
 
-void on_trackbar(int, void*)
-{
-	start_filter();
-}
-
-void callbackButton(int, void*)
-{
-	
-	on_trackbar(alpha, 0);
-}
-
-
-void start_filter()
+void start_filter(int, void*)
 {
 	Mat src = src1.clone();
-	
+
 	//// Extract channels to be processed individually
 	//computeNMChannels(src, channels, 0);
 
@@ -184,6 +171,10 @@ void start_filter()
 			channels.push_back(255 - channels[c]);
 	}
 
+	//set grouping parameters
+	//TODO
+	setGroupParams((float(PAIR_MIN_REGION_DIST) - 50.f) / 100.f, float(PAIR_MAX_REGION_DIST) / 100.f);
+
 	float beta_scaled = float(beta) / 100000;
 	float gamma_scaled = float(gamma) / 10000;
 	float prob1_scaled = float(prob1) / 100.f;
@@ -205,17 +196,17 @@ void start_filter()
 	// Apply the default cascade classifier to each independent channel (could be done in parallel)
 	tic();
 	for (int c = 0; c < (int)channels.size(); c++)
-	 {
+	{
 		er_filter1->run(channels[c], regions[c]);
 		er_filter2->run(channels[c], regions[c]);
 	}
-	toc();
+
 	// Detect character groups
 	vector< vector<Vec2i> > region_groups;
 	vector<Rect> groups_boxes;
-	//erGrouping(src, channels, regions, region_groups, groups_boxes, ERGROUPING_ORIENTATION_HORIZ);
+	erGrouping(src, channels, regions, region_groups, groups_boxes, ERGROUPING_ORIENTATION_HORIZ);
 	//erGrouping(src, channels, regions, region_groups, groups_boxes, ERGROUPING_ORIENTATION_ANY, "E:\\opencv3_2\\sources\\modules\\text\\samples/trained_classifier_erGrouping.xml", 0.1);
-
+	toc();
 	er_show(channels, regions);
 
 	//drow groups
